@@ -1,0 +1,216 @@
+import requests
+import os
+import time
+import traceback
+from datetime import datetime, tzinfo, timedelta
+from zoneinfo import ZoneInfo
+
+from typing import Any, Optional, Tuple
+
+from . import noaa_utils
+from . import const
+from . import daily_forecast
+from . import hourly_forecast
+
+
+class NOAAApi:
+    """The main class to access NOAA weather data.
+
+    This class provides an interface to retrieve weather data from the National Oceanic and Atmospheric Administration (NOAA) API.
+
+    Args:
+      lat: Latitude of the location. Defaults to const.DEFAULT_LAT.
+      lon: Longitude of the location. Defaults to const.DEFAULT_LON.
+      url: URL for the NOAA metadata API. Defaults to const.DEFAULT_NOAA_METADATA_URL.
+      api_key: API key for NOAA API (currently not used, but may be required in the future).
+
+    Attributes:
+      _lat (float): Latitude of the location.
+      _lon (float): Longitude of the location.
+      _url (str): URL for the NOAA metadata API.
+      _api_key (str): API key for NOAA API.
+
+    Example:
+      ```python
+      api = NOAAApi(lat=40.7128, lon=-74.0060)  # Create an instance for New York City
+      ```
+    """
+
+    def __init__(
+        self,
+        lat: float = const.DEFAULT_LAT,
+        lon: float = const.DEFAULT_LON,
+        url: str = const.DEFAULT_NOAA_METADATA_URL,
+        api_key: str = None,
+    ) -> None:
+        """Initialize the NOAAApi object.
+
+        Args:
+          lat: Latitude of the location. Defaults to const.DEFAULT_LAT.
+          lon: Longitude of the location. Defaults to const.DEFAULT_LON.
+          url: URL for the NOAA metadata API. Defaults to const.DEFAULT_NOAA_METADATA_URL.
+          api_key: API key for NOAA API (currently not used, but may be required in the future).
+        """
+        self._lat: float = lat
+        self._lon: float = lon
+        self._url = url
+        self._api_key = api_key  # not used, may be required in the future.
+        self._refresh_interval = const.DEFAULT_REFRESH_INTERVAL
+        self._metadata: dict[str, Any] = None
+        self._metadata_at: float = 0.0
+        self._forecast: dict[str, Any] = None
+        self._forecast_at: float = 0.0
+        self._daily: daily_forecast.DailyForecast
+        self._forecast_hourly: dict[str, Any] = None
+        self._forecast_hourly_at: float = 0.0
+        self._hourly: hourly_forecast.HourlyForecast
+        self._forecast_grid_data: dict[str, Any] = None
+        self._forecast_grid_data_at: float = 0.0
+        self._all_data_ok: bool = False
+        self._all_data_ok_at: float = 0.0
+
+    def set_refresh_interval(self, refresh_interval: float) -> None:
+        self._refresh_interval = refresh_interval
+        if self._refresh_interval < const.MIN_REFRESH_INTERVAL:
+            self._refresh_interval = const.MIN_REFRESH_INTERVAL
+
+    def _get_url(self, url: str) -> Optional[dict[str, Any]]:
+        if not url:
+            return None
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                return response.json()
+        except Exception as ex:
+            print("While reading:", url)
+            traceback.print_exc()
+        return None
+
+    def _get_forecasts(self) -> bool:
+        """Read all forecasts with links in metadata."""
+        if not self._metadata:
+            return False
+        result = True
+        url = self._metadata.get(const.META_PROPERTIES).get(const.META_FORECAST)
+        response = self._get_url(url)
+        if response:
+            self._forecast = response
+            self._forecast_at = time.time()
+            self._daily = daily_forecast.DailyForecast(response, time.time())
+        else:
+            result = False
+        url = self._metadata.get(const.META_PROPERTIES).get(const.META_FORECAST_HOURLY)
+        response = self._get_url(url)
+        if response:
+            self._forecast_hourly = response
+            self._forecast_hourly_at = time.time()
+            self._hourly = hourly_forecast.HourlyForecast(response, time.time())
+        else:
+            result = False
+        url = self._metadata.get(const.META_PROPERTIES).get(
+            const.META_FORECAST_GRID_DATA
+        )
+        response = self._get_url(url)
+        if response:
+            self._forecast_grid_data = response
+            self._forecast_grid_data_at = time.time()
+        else:
+            result = False
+        return result
+
+    def get_for_location(self, lat: float = None, lon: float = None) -> bool:
+        try:
+            if not lat:
+                lat = self._lat
+            if not lon:
+                lon = self._lon
+            lats = (const.LAT_LON_TO_STR % lat).strip()
+            lons = (const.LAT_LON_TO_STR % lon).strip()
+            url = self._url.format(lat=lats, lon=lons)
+            response = self._get_url(url)
+            if response:
+                self._metadata = response
+                self._metadata_at = time.time()
+                self._lat = lat
+                self._lon = lon
+                self._all_data_ok = self._get_forecasts()
+                if self._all_data_ok:
+                    self._all_data_ok_at = time.time()
+                return self._all_data_ok
+        except Exception as ex:  # noqa: BLE001
+            traceback.print_exc()
+        return False
+
+    def refresh(self) -> bool:  # noqa: D102
+        if self._all_data_ok and (
+            time.time() - self._all_data_ok_at < self._refresh_interval
+        ):
+            return True
+        return self.get_for_location()
+
+    def _get_day_forecast_period(
+        self, when: float, is_daytime: bool = True
+    ) -> dict[str, Any] | None:
+        if not self._forecast or not self._forecast_at:
+            return None
+        date = datetime.fromtimestamp(when).date()
+        periods = self._forecast.get("properties").get("periods")
+        for period in periods:
+            if bool(period.get("isDaytime")) == is_daytime:
+                start_time = noaa_utils.iso_to_float_time(period.get("startTime"), None)
+                # for the day, both, day and night forecast start on the same date
+                if date == datetime.fromtimestamp(start_time).date():
+                    return period
+        return None
+
+    def get_forecast_text(
+        self, when: float | None = None, is_daytime: bool = True
+    ) -> str | None:
+        if when is None:
+            when = time.time()
+        forecast_period = self._get_day_forecast_period(when, is_daytime)
+        if not forecast_period:
+            return None
+        return forecast_period.get("detailedForecast")
+
+    def get_forecast_temperature(
+        self, when: float | None = None, is_daytime: bool = True
+    ) -> float | None:
+        if when is None:
+            when = time.time()
+        forecast_period = self._get_day_forecast_period(when, is_daytime)
+        if not forecast_period:
+            return None
+        temperature = float(forecast_period.get("temperature"))
+        temperature_unit = forecast_period.get("temperatureUnit")
+        if temperature_unit == "F":
+            temperature = noaa_utils.convert_F_to_C(temperature)
+        return temperature
+
+    def get_forecast_precipitation(
+        self, when: float | None = None, is_daytime: bool = True
+    ) -> int | None:  # noqa: D102
+        if when is None:
+            when = time.time()
+        forecast_period = self._get_day_forecast_period(when, is_daytime)
+        if not forecast_period:
+            return None
+        value = forecast_period.get("probabilityOfPrecipitation").get("value")
+        try:
+            return int(value)
+        except Exception:  # noqa: BLE001
+            return None
+
+    def get_daily_forecasts(self) -> list[dict[str, any]]:
+        """Generates a list of twice-daily forecasts."""
+        self.refresh()
+        if self._daily:
+            return self._daily.get_forecast()
+        return []
+
+    def get_hourly_forecasts(self):
+        """Generates a list of hourly forecasts."""
+        self.refresh()
+        if self._hourly:
+            return self._hourly.get_forecast()
+        return []
