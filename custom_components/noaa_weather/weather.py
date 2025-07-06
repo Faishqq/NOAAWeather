@@ -59,11 +59,6 @@ async def async_setup_entry(
     coordinator: NOAAWeatherDataUpdateCoordinator = hass.data[DOMAIN][
         config_entry.entry_id
     ]
-    _LOGGER.info(
-        "WEATHER PLATFORM: async_setup_entry called for config entry ID: %s, Location: %s",
-        config_entry.entry_id,
-        coordinator.location_name,
-    )
 
     entities_to_add = [
         NOAAWeather(
@@ -79,11 +74,6 @@ async def async_setup_entry(
     ]
 
     async_add_entities(entities_to_add)
-    _LOGGER.info(
-        "WEATHER PLATFORM: Added %d weather entities for %s.",
-        len(entities_to_add),
-        coordinator.location_name,
-    )
 
 
 class NOAAWeather(CoordinatorEntity[NOAAWeatherDataUpdateCoordinator], WeatherEntity):
@@ -113,13 +103,6 @@ class NOAAWeather(CoordinatorEntity[NOAAWeatherDataUpdateCoordinator], WeatherEn
         type_slug = "hourly" if self._hourly else "daily"
         self._attr_unique_id = f"{location_name_slug}_{type_slug}_weather"
 
-        _LOGGER.info(
-            "WEATHER PLATFORM: Initializing NOAAWeather entity: Base Name: '%s', Type: '%s', Friendly Name: '%s', Unique ID: '%s'",
-            self._base_entity_name,
-            type_slug,
-            self.name,
-            self._attr_unique_id,
-        )
 
     @property
     def entity_registry_enabled_default(self) -> bool:
@@ -179,7 +162,7 @@ class NOAAWeather(CoordinatorEntity[NOAAWeatherDataUpdateCoordinator], WeatherEn
     ):
         """Helper to get value from current conditions or first daily forecast item."""
         if self.coordinator.data is None:
-            _LOGGER.info(  # Kept as INFO
+            _LOGGER.warning(
                 "WEATHER PLATFORM (%s): Coordinator data is None in helper.", self.name
             )
             return None
@@ -201,7 +184,7 @@ class NOAAWeather(CoordinatorEntity[NOAAWeatherDataUpdateCoordinator], WeatherEn
                 or not isinstance(daily_forecast_list, list)
                 or len(daily_forecast_list) == 0
             ):
-                _LOGGER.info(  # Kept as INFO
+                _LOGGER.warning( 
                     "WEATHER PLATFORM (%s): Daily forecast list is empty or not found.",
                     self.name,
                 )
@@ -214,14 +197,14 @@ class NOAAWeather(CoordinatorEntity[NOAAWeatherDataUpdateCoordinator], WeatherEn
             )
 
         if source_data_dict is None:
-            _LOGGER.info(  # Kept as INFO
+            _LOGGER.warning(
                 "WEATHER PLATFORM (%s): Source data dict is None for HA attr %s.",
                 self.name,
                 ha_weather_attr_const,
             )
             return None
         if key_in_source_data is None:
-            _LOGGER.info(  # Kept as INFO
+            _LOGGER.warning(
                 "WEATHER PLATFORM (%s): No mapping found for HA attr %s in relevant map.",
                 self.name,
                 ha_weather_attr_const,
@@ -230,7 +213,7 @@ class NOAAWeather(CoordinatorEntity[NOAAWeatherDataUpdateCoordinator], WeatherEn
 
         value = source_data_dict.get(key_in_source_data)
         if value is None:
-            _LOGGER.info(  # Kept as INFO
+            _LOGGER.warning(
                 "WEATHER PLATFORM (%s): Key '%s' not found in source data for HA attr %s.",
                 self.name,
                 key_in_source_data,
@@ -324,7 +307,7 @@ class NOAAWeather(CoordinatorEntity[NOAAWeatherDataUpdateCoordinator], WeatherEn
         self, forecast_data: list[dict[str, Any]] | None
     ) -> list[Forecast] | None:
         if not forecast_data or not isinstance(forecast_data, list):
-            _LOGGER.info(
+            _LOGGER.warning(
                 "WEATHER PLATFORM (%s): No forecast data or invalid format for processing.",
                 self.name,
             )
@@ -363,7 +346,7 @@ class NOAAWeather(CoordinatorEntity[NOAAWeatherDataUpdateCoordinator], WeatherEn
                         mapped_item[ha_key] = item.get(api_key)
 
             if ATTR_FORECAST_TIME not in mapped_item:
-                _LOGGER.info(
+                _LOGGER.warning(
                     "WEATHER PLATFORM (%s): Forecast item skipped, missing mapped datetime for original item: %s",
                     self.name,
                     item,
@@ -409,25 +392,18 @@ class NOAAWeather(CoordinatorEntity[NOAAWeatherDataUpdateCoordinator], WeatherEn
     async def async_forecast_hourly(self) -> list[Forecast] | None:
         if not self._hourly:
             return None
-        _LOGGER.info(
-            "WEATHER PLATFORM (%s): async_forecast_hourly() called.", self.name
-        )
         if self.coordinator.data:
             raw_hourly_forecast = self.coordinator.data.get(const.ATTR_HOURLY_FORECAST)
             return self._prepare_forecast(raw_hourly_forecast)
-        _LOGGER.info(
-            "WEATHER PLATFORM (%s): No coordinator data for hourly forecast.", self.name
-        )
         return None
 
     async def async_forecast_daily(self) -> list[Forecast] | None:
         if self._hourly:
             return None
-        _LOGGER.info("WEATHER PLATFORM (%s): async_forecast_daily() called.", self.name)
         if self.coordinator.data:
             raw_daily_forecast = self.coordinator.data.get(const.ATTR_DAILY_FORECAST)
             return self._prepare_forecast(raw_daily_forecast)
-        _LOGGER.info(
+        _LOGGER.warning(
             "WEATHER PLATFORM (%s): No coordinator data for daily forecast.", self.name
         )
         return None

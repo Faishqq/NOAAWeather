@@ -240,26 +240,15 @@ def _extract_forecast_series(
     """
     processed_series_data = []
     if not coordinator_data:
-        _LOGGER.info(
-            "SENSOR PLATFORM: _extract_forecast_series called with no coordinator_data."
-        )
         return []
 
     list_of_forecast_periods = coordinator_data.get(forecast_attr, [])
 
     if not isinstance(list_of_forecast_periods, list):
-        _LOGGER.info(
-            "SENSOR PLATFORM: Forecast data for %s is not a list: %s",
-            forecast_attr,
-            list_of_forecast_periods,
-        )
         return []
 
     for period_data in list_of_forecast_periods:
         if not isinstance(period_data, dict):
-            _LOGGER.info(
-                "SENSOR PLATFORM: Forecast period data is not a dict: %s", period_data
-            )
             continue
 
         value = period_data.get(sensor_key)
@@ -291,7 +280,7 @@ def _extract_forecast_series(
             )
 
         elif value is not None and datetime_str_for_charting is None:
-            _LOGGER.info(
+            _LOGGER.warning(
                 "SENSOR PLATFORM: Sensor key '%s' for %s found but 'datetime' missing in period: %s. Value will be orphaned for charting.",
                 sensor_key,
                 forecast_attr,
@@ -334,12 +323,6 @@ class NOAAWeatherSensor(
         self._sensor_series_data: list[dict[str, Any]] = []
         self._update_sensor_data()
 
-        _LOGGER.info(
-            "SENSOR PLATFORM: Initialized Sensor: '%s', Unique ID: '%s', Device: %s",
-            self._attr_name,
-            self._attr_unique_id,
-            self._attr_device_info.get("name") if self._attr_device_info else "None",
-        )
 
     def _update_sensor_data(self) -> None:
         """Update the sensor's series data from the coordinator."""
@@ -356,7 +339,7 @@ class NOAAWeatherSensor(
             ):
                 forecast_attr_key_to_use = ATTR_DAILY_FORECAST
             else:  # Neither available
-                _LOGGER.info(
+                _LOGGER.warning(
                     "SENSOR PLATFORM: No hourly or daily data for %s.", self.name
                 )
                 self._sensor_series_data = []
@@ -374,21 +357,7 @@ class NOAAWeatherSensor(
                 self.entity_description.key,
                 forecast_attr_key_to_use,
             )
-            _LOGGER.info(
-                "SENSOR PLATFORM: Updated sensor data for %s (%s using %s): %s items. First item value if any: %s",
-                self.name,
-                self.entity_description.key,
-                forecast_attr_key_to_use.split("_")[0],
-                len(self._sensor_series_data),
-                self._sensor_series_data[0].get("value")
-                if self._sensor_series_data
-                else "N/A",
-            )
         else:
-            _LOGGER.info(
-                "SENSOR PLATFORM: _update_sensor_data called for %s but coordinator.data is None.",
-                self.name,
-            )
             self._sensor_series_data = []
 
     @property
@@ -461,9 +430,6 @@ class NOAAWeatherSensor(
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle data update."""
-        _LOGGER.info(
-            "SENSOR PLATFORM: _handle_coordinator_update received for %s", self.name
-        )
         self._update_sensor_data()
         self.async_write_ha_state()
 
@@ -474,10 +440,6 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add NOAAWeather entities from a config_entry."""
-    _LOGGER.info(
-        "SENSOR PLATFORM: async_setup_entry called for config entry ID: %s.",
-        config_entry.entry_id,
-    )
 
     coordinator: NOAAWeatherDataUpdateCoordinator | None = hass.data.get(
         DOMAIN, {}
@@ -496,7 +458,7 @@ async def async_setup_entry(
             coordinator.location_name,
         )
     else:
-        _LOGGER.info(
+        _LOGGER.warning(
             "SENSOR PLATFORM: Coordinator data is available for %s. Hourly: %s items. Daily: %s items.",
             coordinator.location_name,
             len(coordinator.data.get(ATTR_HOURLY_FORECAST, []))
@@ -518,11 +480,6 @@ async def async_setup_entry(
     ):
         hourly_forecast_data = coordinator.data.get(ATTR_HOURLY_FORECAST, [])
         if hourly_forecast_data and isinstance(hourly_forecast_data[0], dict):
-            _LOGGER.info(
-                "SENSOR PLATFORM: Hourly forecast data IS present with %d periods for %s. Creating hourly sensors.",
-                len(hourly_forecast_data),
-                coordinator.location_name,
-            )
             first_period_keys_hourly = hourly_forecast_data[0].keys()
             for description in FORECAST_SENSOR_TYPES:
                 if description.key == KEY_LAST_API_UPDATE_FROM_CLIENT:
@@ -534,29 +491,21 @@ async def async_setup_entry(
                             NOAAWeatherSensor(coordinator, description, "hourly")
                         )  # forecast_type is nominal here
                         last_update_sensor_added_flag = True
-                        _LOGGER.info(
-                            "SENSOR PLATFORM: Queued 'Last Weather Data Update' sensor (from hourly data) for %s.",
-                            coordinator.location_name,
-                        )
+
                     continue
 
                 if description.key in first_period_keys_hourly:
                     sensors_to_add.append(
                         NOAAWeatherSensor(coordinator, description, "hourly")
                     )
-                    _LOGGER.info(
-                        "SENSOR PLATFORM: Queued hourly sensor for %s: %s",
-                        coordinator.location_name,
-                        description.name,
-                    )
                 elif description.key != KEY_LAST_API_UPDATE_FROM_CLIENT:
-                    _LOGGER.info(
+                    _LOGGER.warning(
                         "SENSOR PLATFORM: Skipping hourly sensor for %s key '%s'; not in first hourly period keys.",
                         coordinator.location_name,
                         description.key,
                     )
         else:
-            _LOGGER.info(
+            _LOGGER.warning(
                 "SENSOR PLATFORM: Hourly forecast data is empty or first item not a dict for %s. Skipping hourly sensors.",
                 coordinator.location_name,
             )
@@ -586,11 +535,6 @@ async def async_setup_entry(
     if coordinator.data and isinstance(coordinator.data.get(ATTR_DAILY_FORECAST), list):
         daily_forecast_data = coordinator.data.get(ATTR_DAILY_FORECAST, [])
         if daily_forecast_data and isinstance(daily_forecast_data[0], dict):
-            _LOGGER.info(
-                "SENSOR PLATFORM: Daily forecast data IS present with %d periods for %s. Creating daily sensors.",
-                len(daily_forecast_data),
-                coordinator.location_name,
-            )
             first_period_keys_daily = daily_forecast_data[0].keys()
             for description in FORECAST_SENSOR_TYPES:
                 if description.key == KEY_LAST_API_UPDATE_FROM_CLIENT:
@@ -602,10 +546,6 @@ async def async_setup_entry(
                             NOAAWeatherSensor(coordinator, description, "daily")
                         )  # forecast_type is nominal here
                         last_update_sensor_added_flag = True
-                        _LOGGER.info(
-                            "SENSOR PLATFORM: Queued 'Last Weather Data Update' sensor (from daily data) for %s.",
-                            coordinator.location_name,
-                        )
                     continue
 
                 if (
@@ -625,16 +565,11 @@ async def async_setup_entry(
                         sensors_to_add.append(
                             NOAAWeatherSensor(coordinator, description, "daily")
                         )
-                        _LOGGER.info(
-                            "SENSOR PLATFORM: Queued daily sensor for %s: %s",
-                            coordinator.location_name,
-                            description.name,
-                        )
                     elif description.key not in [
                         "native_templow",
                         "native_temperature",
                     ]:
-                        _LOGGER.info(
+                        _LOGGER.warning(
                             "SENSOR PLATFORM: Sensor for key '%s' already added as hourly, skipping daily for %s.",
                             description.key,
                             coordinator.location_name,
@@ -644,13 +579,13 @@ async def async_setup_entry(
                     description.key in daily_sensor_keys_of_interest
                     and description.key != KEY_LAST_API_UPDATE_FROM_CLIENT
                 ):
-                    _LOGGER.info(
+                    _LOGGER.warning(
                         "SENSOR PLATFORM: Skipping daily sensor for %s key '%s'; not in first daily period keys.",
                         coordinator.location_name,
                         description.key,
                     )
         else:
-            _LOGGER.info(
+            _LOGGER.warning(
                 "SENSOR PLATFORM: Daily forecast data is empty or first item not a dict for %s. Skipping daily sensors.",
                 coordinator.location_name,
             )
@@ -683,13 +618,8 @@ async def async_setup_entry(
 
     if sensors_to_add:
         async_add_entities(sensors_to_add)
-        _LOGGER.info(
-            "SENSOR PLATFORM: Added %d NOAA weather forecast sensors in total for %s.",
-            len(sensors_to_add),
-            coordinator.location_name,
-        )
     else:
-        _LOGGER.info(
+        _LOGGER.warning(
             "SENSOR PLATFORM: No NOAA weather forecast sensors were added for %s.",
             coordinator.location_name,
         )

@@ -61,7 +61,6 @@ class NOAAProxy:
             url=self._noaa_url,
             api_key=self._api_key,
         )
-        self._logger.info("NOAAProxy initialized with session: %s", self._session)
 
     async def async_get_current_conditions(self) -> dict[str, Any]:
         # This method should ideally fetch actual current conditions.
@@ -70,15 +69,6 @@ class NOAAProxy:
         # provides data where the first entry is suitable as "current".
         hourly_forecasts = await self._noaa_api.async_get_hourly_forecasts()
         if hourly_forecasts:
-            self._logger.info(
-                "NOAA_PROXY: async_get_current_conditions(): Based on first hourly. Count: %d",
-                len(hourly_forecasts),
-            )
-            # Use DEBUG for potentially large objects to avoid flooding logs
-            self._logger.debug(
-                "NOAA_PROXY: async_get_current_conditions(): Current forecast used: %s",
-                str(hourly_forecasts[0]),
-            )
             return hourly_forecasts[0]
         self._logger.warning(
             "NOAA_PROXY: async_get_current_conditions(): No hourly forecast data to derive current conditions."
@@ -87,16 +77,8 @@ class NOAAProxy:
 
     async def async_get_hourly_forecast(self) -> list[dict[str, Any]]:
         hourly_forecasts = await self._noaa_api.async_get_hourly_forecasts()
-        self._logger.info(
-            "NOAA_PROXY: async_get_hourly_forecast: Hourly forecast records: %d",
-            len(hourly_forecasts) if hourly_forecasts else 0,
-        )
         return hourly_forecasts if hourly_forecasts is not None else []
 
     async def async_get_daily_forecast(self) -> list[dict[str, Any]]:
         daily_forecasts = await self._noaa_api.async_get_daily_forecasts()
-        self._logger.info(
-            "NOAA_PROXY: async_get_daily_forecast: Daily forecast records: %d",
-            len(daily_forecasts) if daily_forecasts else 0,
-        )
         return daily_forecasts if daily_forecasts is not None else []
