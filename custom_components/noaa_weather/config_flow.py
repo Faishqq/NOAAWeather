@@ -214,7 +214,7 @@ class NoaaOptionsFlowHandler(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
-        self.config_entry = config_entry
+        #self.config_entry = config_entry
         # Initialize options with existing options, or empty dict if none
         self.options = dict(config_entry.options)
         _LOGGER.debug(
@@ -225,7 +225,7 @@ class NoaaOptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> config_entries.ConfigFlowResult:
         """Manage the options for the NOAA Weather integration."""
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -249,6 +249,7 @@ class NoaaOptionsFlowHandler(config_entries.OptionsFlow):
             )  # title is not used for options entry
 
         # Get the schema for the options form, pre-filled with current settings
+
         options_schema = _get_data_schema(self.hass, self.config_entry)
 
         return self.async_show_form(

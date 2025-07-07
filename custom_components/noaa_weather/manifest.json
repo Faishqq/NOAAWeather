@@ -2,7 +2,7 @@
   "domain": "noaa_weather",
   "name": "NOAAWeather",
   "icon": "mdi:weather-partly-cloudy",
-  "codeowners": ["@malixm"],
+  "codeowners": ["@Faishqq"],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://www.home-assistant.io/integrations/noaa_weather",
