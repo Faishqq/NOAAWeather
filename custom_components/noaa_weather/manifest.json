@@ -6,6 +6,7 @@
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://www.home-assistant.io/integrations/noaa_weather",
+  "integration_type": "hub",
   "homekit": {},
   "iot_class": "cloud_polling",
   "requirements": ["requests==2.32.3"],
