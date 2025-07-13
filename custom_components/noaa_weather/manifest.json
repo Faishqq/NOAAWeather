@@ -5,7 +5,7 @@
   "codeowners": ["@Faishqq"],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://www.home-assistant.io/integrations/noaa_weather",
+  "documentation": "https://github.com/Faishqq/noaa_weather/README.md",
   "issue_tracker": "https://github.com/Faishqq/noaa_weather/issues",
   "integration_type": "hub",
   "homekit": {},
