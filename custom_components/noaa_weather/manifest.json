@@ -6,7 +6,7 @@
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://www.home-assistant.io/integrations/noaa_weather",
-  "issue_tracker": "https://www.home-assistant.io/integrations/noaa_weather/issues",
+  "issue_tracker": "https://https://github.com/Faishqq/noaa_weather/issues",
   "integration_type": "hub",
   "homekit": {},
   "iot_class": "cloud_polling",
