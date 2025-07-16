@@ -1,7 +1,6 @@
 {
   "domain": "noaa_weather",
   "name": "NOAAWeather",
-  "icon": "mdi:weather-partly-cloudy",
   "codeowners": ["@Faishqq"],
   "config_flow": true,
   "dependencies": [],
