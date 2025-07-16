@@ -5,12 +5,12 @@
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/Faishqq/noaa_weather/README.md",
-  "issue_tracker": "https://github.com/Faishqq/noaa_weather/issues",
-  "integration_type": "hub",
-  "version": "2025.6.0",
   "homekit": {},
+  "integration_type": "hub",
   "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/Faishqq/noaa_weather/issues",
   "requirements": ["requests==2.32.3"],
   "ssdp": [],
+  "version": "2025.6.0",
   "zeroconf": []
 }
